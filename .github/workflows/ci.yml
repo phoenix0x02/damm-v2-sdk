@@ -19,13 +19,23 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      # Plain git instead of tj-actions/changed-files (compromised in 2025;
+      # a mutable tag must not run with repository access).
       - name: Get specific changed files
         id: changed-files-specific
-        uses: tj-actions/changed-files@v18.6
-        with:
-          files: |
-            src
-            tests
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          changed="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- src tests)"
+          echo "Changed files under src/ or tests/:"
+          echo "${changed:-<none>}"
+          if [ -n "$changed" ]; then
+            echo "any_changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "any_changed=false" >> "$GITHUB_OUTPUT"
+          fi
 
   sdk_test:
     runs-on: ubuntu-latest
